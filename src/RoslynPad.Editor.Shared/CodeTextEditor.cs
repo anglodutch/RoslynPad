@@ -44,6 +44,9 @@ namespace RoslynPad.Editor
         private CustomCompletionWindow _completionWindow;
         private OverloadInsightWindow _insightWindow;
         private ToolTip _toolTip;
+#if !AVALONIA
+        private SearchReplacePanel _searchPanel;
+#endif
 
 #if AVALONIA
         Type IStyleable.StyleKey => typeof(TextEditor);
@@ -80,7 +83,7 @@ namespace RoslynPad.Editor
             MouseHoverStopped += OnMouseHoverStopped;
 
             ToolTipService.SetInitialShowDelay(this, 0);
-            SearchReplacePanel.Install(this);
+            _searchPanel = SearchReplacePanel.Install(this);
 #endif
 
             var commandBindings = TextArea.CommandBindings;
@@ -92,11 +95,20 @@ namespace RoslynPad.Editor
             }
 
             var contextMenu = new ContextMenu();
-            contextMenu.SetItems(new[]
+            contextMenu.SetItems(new Control[]
             {
+                //new MenuItem {Command = new RoutedCommand("Format Document", new KeyGesture{Key= Key.D, ModifierKeys.Control})},
+                //typeof(CodeTextEditor), new InputGestureCollection{  new KeyGesture
+                //( Key.D, ModifierKeys.Control, "Format Document")})},
+                //new MenuItem {Command = new RoutedCommand("Comment Selection", )},
+                //new MenuItem {Command = new RoutedCommand("Uncomment Selection", )},
+                //new Separator(),
+                new MenuItem {Command = ApplicationCommands.Find},
+                new MenuItem {Command = ApplicationCommands.Replace},
+                new Separator(), 
                 new MenuItem {Command = ApplicationCommands.Cut},
                 new MenuItem {Command = ApplicationCommands.Copy},
-                new MenuItem {Command = ApplicationCommands.Paste}
+                new MenuItem {Command = ApplicationCommands.Paste},
             });
             ContextMenu = contextMenu;
         }
@@ -104,10 +116,7 @@ namespace RoslynPad.Editor
         public static readonly StyledProperty<Brush> CompletionBackgroundProperty = CommonProperty.Register<CodeTextEditor, Brush>(
             nameof(CompletionBackground), CreateDefaultCompletionBackground());
 
-        public bool IsCompletionWindowOpen
-        {
-            get => _completionWindow?.IsVisible == true;
-        }
+        public bool IsCompletionWindowOpen => _completionWindow?.IsVisible == true;
 
         public void CloseCompletionWindow()
         {
@@ -117,11 +126,13 @@ namespace RoslynPad.Editor
                 _completionWindow = null;
             }
         }
-
-        public bool IsInsightWindowOpen
+#if !AVALONIA
+        public void ActivateSearch()
         {
-            get => _insightWindow?.IsVisible == true;
+            _searchPanel.Reactivate();
         }
+#endif
+        public bool IsInsightWindowOpen => _insightWindow?.IsVisible == true;
 
         public void CloseInsightWindow()
         {
@@ -156,6 +167,13 @@ namespace RoslynPad.Editor
                 // ReSharper disable once UnusedVariable
                 var task = ShowCompletion(mode);
             }
+#if !AVALONIA
+            if (e.Key == Key.F && e.HasModifiers(ModifierKeys.Control))
+            {
+                e.Handled = true;
+                _searchPanel.Reactivate();
+            }
+#endif
         }
 
         private enum TriggerMode
@@ -167,6 +185,7 @@ namespace RoslynPad.Editor
 
         public static readonly RoutedEvent ToolTipRequestEvent = CommonEvent.Register<CodeTextEditor, ToolTipRequestEventArgs>(
             nameof(ToolTipRequest), RoutingStrategy.Bubble);
+
 
         public Func<ToolTipRequestEventArgs, Task> AsyncToolTipRequest { get; set; }
 
@@ -255,7 +274,7 @@ namespace RoslynPad.Editor
 #endif
         }
 
-        #region Open & Save File
+#region Open & Save File
 
         public void OpenFile(string fileName)
         {
@@ -284,9 +303,9 @@ namespace RoslynPad.Editor
             return true;
         }
 
-        #endregion
+#endregion
 
-        #region Code Completion
+#region Code Completion
 
         public ICodeEditorCompletionProvider CompletionProvider { get; set; }
 
@@ -398,7 +417,7 @@ namespace RoslynPad.Editor
             return Document;
         }
 
-        #endregion
+#endregion
 
         private class CustomCompletionWindow : CompletionWindow
         {
